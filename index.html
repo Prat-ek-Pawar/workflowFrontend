@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>n8n Workflow Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #0d1117;
+            color: #c9d1d9;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            line-height: 1.5;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 15px;
+            width: 100%;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #58a6ff;
+            margin-bottom: 10px;
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            word-break: break-word;
+        }
+        
+        .header p {
+            font-size: clamp(0.875rem, 2.5vw, 1rem);
+            opacity: 0.8;
+        }
+        
+        .input-section {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+        
+        .input-section h2 {
+            margin-bottom: 15px;
+            color: #f0f6fc;
+            font-size: clamp(1rem, 3vw, 1.25rem);
+        }
+        
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 12px;
+            color: #c9d1d9;
+            font-family: ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+            resize: vertical;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #58a6ff;
+            box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            background: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 12px 24px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            min-height: 44px;
+            min-width: 80px;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        button:hover:not(:disabled) {
+            background: #30363d;
+            border-color: #58a6ff;
+            transform: translateY(-1px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        .primary-btn {
+            background: #238636 !important;
+            color: #fff !important;
+            flex: 1;
+            min-width: 120px;
+        }
+        
+        .primary-btn:hover:not(:disabled) {
+            background: #2ea043 !important;
+        }
+        
+        .primary-btn:disabled {
+            background: #1f2937 !important;
+        }
+        
+        .loading-spinner {
+            display: none;
+            width: 16px;
+            height: 16px;
+            border: 2px solid transparent;
+            border-top: 2px solid #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+        
+        .primary-btn:disabled .loading-spinner {
+            display: inline-block;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .editor-section {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+        
+        .editor-section.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .editor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .editor-header h2 {
+            color: #f0f6fc;
+            font-size: clamp(1rem, 3vw, 1.25rem);
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .copy-btn {
+            white-space: nowrap;
+            min-width: 100px;
+        }
+        
+        #editor {
+            width: 100%;
+            height: clamp(300px, 50vh, 600px);
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        .status-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 1000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+        
+        .status-indicator.show {
+            transform: translateX(0);
+        }
+        
+        .status-indicator.processing {
+            background: #ffa500;
+            color: #000;
+        }
+        
+        .status-indicator.success {
+            background: #238636;
+            color: #fff;
+        }
+        
+        .status-indicator.error {
+            background: #da3633;
+            color: #fff;
+        }
+        
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header {
+                margin-bottom: 20px;
+            }
+            
+            .input-section, .editor-section {
+                padding: 12px;
+                border-radius: 6px;
+            }
+            
+            textarea {
+                min-height: 100px;
+                font-size: 16px; /* Prevents zoom on iOS */
+                padding: 10px;
+            }
+            
+            button {
+                padding: 14px 20px;
+                font-size: 16px;
+                min-height: 48px;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+            
+            .primary-btn {
+                width: 100%;
+            }
+            
+            .editor-header {
+                flex-direction: column;
+                align-items: stretch;
+                text-align: center;
+            }
+            
+            .copy-btn {
+                width: 100%;
+                margin-top: 10px;
+            }
+            
+            #editor {
+                height: clamp(250px, 40vh, 400px);
+            }
+            
+            .status-indicator {
+                top: 10px;
+                right: 10px;
+                left: 10px;
+                text-align: center;
+            }
+        }
+        
+        /* Tablet Styles */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .container {
+                padding: 20px;
+                max-width: 900px;
+            }
+            
+            #editor {
+                height: clamp(400px, 45vh, 500px);
+            }
+            
+            textarea {
+                font-size: 15px;
+            }
+        }
+        
+        /* Large Desktop */
+        @media (min-width: 1200px) {
+            .container {
+                max-width: 1400px;
+            }
+            
+            #editor {
+                height: 600px;
+            }
+        }
+        
+        /* Touch device optimizations */
+        @media (hover: none) and (pointer: coarse) {
+            button:hover {
+                transform: none;
+            }
+            
+            button:active {
+                background: #30363d;
+                transform: scale(0.98);
+            }
+            
+            textarea {
+                font-size: 16px; /* Prevents zoom on mobile */
+            }
+        }
+        
+        /* High DPI displays */
+        @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+            button {
+                border-width: 0.5px;
+            }
+            
+            .input-section, .editor-section {
+                border-width: 0.5px;
+            }
+        }
+        
+        /* Accessibility improvements */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+            
+            .loading-spinner {
+                animation: none;
+            }
+        }
+        
+        /* Dark mode support (system preference) */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: #0d1117;
+            }
+        }
+        
+        @media (prefers-color-scheme: light) {
+            /* Keep dark theme regardless of system preference */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1> n8n Workflow Generator</h1>
+            <p>Generate stunning workflows</p>
+        </div>
+        
+        <div class="input-section">
+          <h2>Describe Your Workflow In Detailed</h2>
+            <textarea 
+                id="promptInput" 
+                placeholder="Describe the workflow you want to create please mention in details to reduce errors &#10;&#10;Examples:&#10;• I want to send an email when a new entry is added to a form&#10;• Create a workflow that saves form data to Supabase database&#10;• Send a Slack notification when someone fills out a contact form"
+            ></textarea>
+            <div class="button-group">
+                <button id="generateBtn" class="primary-btn">
+                    <span class="loading-spinner"></span>
+                    <span id="btnText">Send</span>
+                </button>
+            </div>
+        </div>
+        
+        <div class="editor-section" id="editorSection">
+            <div class="editor-header">
+                <h2>Generated n8n Workflow</h2>
+                <button id="copyBtn" class="copy-btn">Copy All</button>
+            </div>
+            <div id="editor"></div>
+        </div>
+        
+        <div id="statusIndicator" class="status-indicator">
+            <span id="statusText">Ready</span>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
