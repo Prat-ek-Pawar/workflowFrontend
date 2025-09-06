@@ -371,15 +371,18 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1> n8n Workflow Generator</h1>
-            <p>Generate stunning workflows</p>
+            <h1>🤖 n8n Workflow Generator</h1>
+            <p>Generate production-ready n8n workflows using AI</p>
         </div>
         
         <div class="input-section">
-          <h2>Describe Your Workflow In Detailed</h2>
+            <h2>📝 Describe Your Workflow</h2>
+            <div id="backendStatus" class="backend-status" style="display: none; margin-bottom: 15px; padding: 10px; background: #ffa500; color: #000; border-radius: 6px; font-size: 14px; text-align: center;">
+                🔄 Starting backend server...
+            </div>
             <textarea 
                 id="promptInput" 
-                placeholder="Describe the workflow you want to create please mention in details to reduce errors &#10;&#10;Examples:&#10;• I want to send an email when a new entry is added to a form&#10;• Create a workflow that saves form data to Supabase database&#10;• Send a Slack notification when someone fills out a contact form"
+                placeholder="Describe the workflow you want to create in natural language...&#10;&#10;Examples:&#10;• I want to send an email when a new entry is added to a form&#10;• Create a workflow that saves form data to Supabase database&#10;• Send a Slack notification when someone fills out a contact form"
             ></textarea>
             <div class="button-group">
                 <button id="generateBtn" class="primary-btn">
@@ -391,7 +394,7 @@
         
         <div class="editor-section" id="editorSection">
             <div class="editor-header">
-                <h2>Generated n8n Workflow</h2>
+                <h2>🔧 Generated n8n Workflow</h2>
                 <button id="copyBtn" class="copy-btn">Copy All</button>
             </div>
             <div id="editor"></div>

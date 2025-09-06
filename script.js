@@ -33,6 +33,111 @@ const btnText = document.getElementById('btnText');
 const copyBtn = document.getElementById('copyBtn');
 const statusIndicator = document.getElementById('statusIndicator');
 const statusText = document.getElementById('statusText');
+const backendStatusDiv = document.getElementById('backendStatus');
+
+// Backend status management
+let backendReady = false;
+const BACKEND_URL = 'https://workflowgenerator.onrender.com';
+
+// Backend warmup function
+async function warmupBackend() {
+    if (backendReady) return true;
+    
+    // Show backend status indicator
+    if (backendStatusDiv) {
+        backendStatusDiv.style.display = 'block';
+        backendStatusDiv.innerHTML = '🔄 Starting backend server...';
+    }
+    
+    showStatus('🔄 Waking up backend server...', 'processing');
+    
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/ping`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+            },
+            mode: 'cors'
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.status === 'ready') {
+                backendReady = true;
+                
+                // Hide backend status indicator
+                if (backendStatusDiv) {
+                    backendStatusDiv.style.display = 'none';
+                }
+                
+                showStatus('✅ Backend ready!', 'success');
+                return true;
+            }
+        }
+        
+        throw new Error('Backend not ready');
+    } catch (error) {
+        console.log('Backend warmup failed, will retry:', error);
+        
+        // Update backend status indicator
+        if (backendStatusDiv) {
+            backendStatusDiv.innerHTML = '⏳ Backend server is starting up... This may take 30-60 seconds';
+        }
+        
+        showStatus('⏳ Starting backend server... This may take 30-60 seconds', 'processing');
+        
+        // Retry every 5 seconds for up to 2 minutes
+        let retries = 0;
+        const maxRetries = 24; // 2 minutes
+        
+        return new Promise((resolve) => {
+            const retryInterval = setInterval(async () => {
+                retries++;
+                
+                try {
+                    const retryResponse = await fetch(`${BACKEND_URL}/api/ping`, {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' },
+                        mode: 'cors'
+                    });
+                    
+                    if (retryResponse.ok) {
+                        const data = await retryResponse.json();
+                        if (data.status === 'ready') {
+                            clearInterval(retryInterval);
+                            backendReady = true;
+                            
+                            // Hide backend status indicator
+                            if (backendStatusDiv) {
+                                backendStatusDiv.style.display = 'none';
+                            }
+                            
+                            showStatus('✅ Backend ready!', 'success');
+                            resolve(true);
+                            return;
+                        }
+                    }
+                } catch (retryError) {
+                    console.log(`Retry ${retries}/${maxRetries} failed:`, retryError);
+                }
+                
+                if (retries >= maxRetries) {
+                    clearInterval(retryInterval);
+                    
+                    // Update backend status indicator for timeout
+                    if (backendStatusDiv) {
+                        backendStatusDiv.innerHTML = '❌ Backend startup timeout. Please try refreshing the page.';
+                        backendStatusDiv.style.background = '#da3633';
+                        backendStatusDiv.style.color = '#fff';
+                    }
+                    
+                    showStatus('❌ Backend startup timeout. Please try again later.', 'error');
+                    resolve(false);
+                }
+            }, 5000);
+        });
+    }
+}
 
 // Status management
 function showStatus(message, type = 'processing') {
@@ -52,13 +157,18 @@ let isRequestInProgress = false;
 function setRequestState(inProgress) {
     isRequestInProgress = inProgress;
     
-    // Disable/enable submit button
-    generateBtn.disabled = inProgress;
-    btnText.textContent = inProgress ? 'Generating...' : 'Send';
+    // Disable/enable submit button based on backend readiness and request state
+    generateBtn.disabled = inProgress || !backendReady;
+    
+    if (!backendReady) {
+        btnText.textContent = 'Backend Starting...';
+    } else {
+        btnText.textContent = inProgress ? 'Generating...' : 'Send';
+    }
     
     // Disable/enable textarea
-    promptInput.disabled = inProgress;
-    promptInput.style.opacity = inProgress ? '0.6' : '1';
+    promptInput.disabled = inProgress || !backendReady;
+    promptInput.style.opacity = (inProgress || !backendReady) ? '0.6' : '1';
     
     // Disable/enable copy button
     copyBtn.disabled = inProgress;
@@ -71,7 +181,7 @@ function setRequestState(inProgress) {
     // Update status
     if (inProgress) {
         showStatus('Generating workflow...', 'processing');
-    } else {
+    } else if (backendReady) {
         showStatus('Ready', 'success');
     }
 }
@@ -98,6 +208,15 @@ async function generateCode(prompt) {
         return;
     }
     
+    // Check if backend is ready, warm it up if not
+    if (!backendReady) {
+        const isReady = await warmupBackend();
+        if (!isReady) {
+            showStatus('❌ Backend is not available. Please try again later.', 'error');
+            return;
+        }
+    }
+    
     try {
         setRequestState(true);
         
@@ -115,7 +234,7 @@ async function generateCode(prompt) {
             editor.setValue('⏳ Generating n8n workflow, please wait...\n\n• Analyzing your requirements\n• Planning the workflow\n• Generating production-ready code\n\nThis may take 30-60 seconds...');
         }
         
-        const response = await fetch('https://workflowgenerator.onrender.com/api/generate', {
+        const response = await fetch(`${BACKEND_URL}/api/generate`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -314,16 +433,26 @@ async function copyToClipboard() {
 }
 
 // Event listeners
-generateBtn.addEventListener('click', () => {
+generateBtn.addEventListener('click', async () => {
     if (isRequestInProgress) return;
     
     const prompt = promptInput.value.trim();
-    if (prompt) {
-        generateCode(prompt);
-    } else {
+    if (!prompt) {
         showStatus('Please enter a workflow description first!', 'error');
         promptInput.focus();
+        return;
     }
+    
+    // Ensure backend is ready before allowing generation
+    if (!backendReady) {
+        const isReady = await warmupBackend();
+        if (!isReady) {
+            showStatus('❌ Backend is not available. Please try again later.', 'error');
+            return;
+        }
+    }
+    
+    generateCode(prompt);
 });
 
 copyBtn.addEventListener('click', copyToClipboard);
@@ -352,7 +481,13 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Initialize UI state
-document.addEventListener('DOMContentLoaded', () => {
+// Initialize UI state and warm up backend
+document.addEventListener('DOMContentLoaded', async () => {
+    setRequestState(false);
+    
+    // Start backend warmup immediately when page loads
+    await warmupBackend();
+    
+    // Update UI to reflect backend status
     setRequestState(false);
 });
