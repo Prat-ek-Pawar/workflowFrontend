@@ -250,14 +250,27 @@ async function generateCode(prompt) {
             try {
                 const errorData = await response.json();
                 errorMessage = errorData.message || errorData.error || `HTTP error! status: ${response.status}`;
-            } catch {
-                // If we can't parse JSON, create a generic error message
+                
+                // Enhanced error messages based on status codes
                 if (response.status === 402) {
-                    errorMessage = 'OpenAI API quota exceeded. Please check your billing settings.';
+                    errorMessage = `OpenAI API quota exceeded. ${errorMessage}`;
                 } else if (response.status === 429) {
-                    errorMessage = 'Rate limit exceeded. Please wait before trying again.';
+                    errorMessage = `Rate limit exceeded. ${errorMessage}`;
+                } else if (response.status === 500) {
+                    errorMessage = `Server error occurred. ${errorMessage}`;
+                }
+            } catch {
+                // If we can't parse JSON, create detailed error messages based on status
+                if (response.status === 402) {
+                    errorMessage = 'OpenAI API quota exceeded. Your API usage limit has been reached. Please check your OpenAI billing settings and add credits to continue.';
+                } else if (response.status === 429) {
+                    errorMessage = 'Rate limit exceeded. Too many requests have been made. Please wait a few minutes before trying again.';
+                } else if (response.status === 500) {
+                    errorMessage = 'Internal server error. The backend service encountered an error. Please try again in a few moments.';
+                } else if (response.status === 503) {
+                    errorMessage = 'Service temporarily unavailable. The backend is likely still starting up. Please wait and try again.';
                 } else {
-                    errorMessage = `HTTP error! status: ${response.status}`;
+                    errorMessage = `HTTP error! status: ${response.status} - Please check the backend server logs for more details.`;
                 }
             }
             
@@ -314,18 +327,27 @@ async function generateCode(prompt) {
             // Create detailed error message based on error type
             let errorDisplay;
             
-            if (error.message.includes('quota exceeded')) {
+            if (error.message.includes('quota exceeded') || error.message.includes('insufficient_quota')) {
                 errorDisplay = `❌ ERROR: OpenAI API Quota Exceeded
 
 ${error.message}
 
-🔧 How to fix:
-1. Go to https://platform.openai.com/account/billing
-2. Add payment method or increase your usage limit
-3. Check your current usage and billing status
-4. Make sure your API key has sufficient credits
+🔧 How to fix this issue:
+1. Visit OpenAI Billing: https://platform.openai.com/account/billing
+2. Add a payment method or increase your usage limit
+3. Check your current usage and remaining credits
+4. Ensure your API key has sufficient credits
+5. If using free tier, consider upgrading to a paid plan
 
-⚠️  Note: Free tier has limited usage. Consider upgrading to a paid plan.`;
+⚠️  Common causes:
+• Free tier usage limit reached ($5 limit)
+• Monthly billing limit exceeded
+• Invalid or expired payment method
+• API key from inactive account
+
+💡 Quick check: Log into OpenAI dashboard to verify your account status.
+
+🔄 After fixing billing, refresh this page and try again.`;
             } else if (error.message.includes('Rate limit exceeded') || error.message.includes('rate limit')) {
                 errorDisplay = `❌ ERROR: Rate Limit Exceeded
 
@@ -370,7 +392,14 @@ ${error.message}
         } else {
             // Fallback if Monaco Editor fails
             const editorDiv = document.getElementById('editor');
-            editorDiv.innerHTML = `<pre style="padding: 20px; color: #f85149; font-family: monospace; white-space: pre-wrap;">${error.message}</pre>`;
+            let fallbackMessage = error.message;
+            
+            // Add extra context for quota errors in fallback
+            if (error.message.includes('quota exceeded')) {
+                fallbackMessage += `\n\n🔧 SOLUTION:\n1. Visit: https://platform.openai.com/account/billing\n2. Add payment method or credits\n3. Refresh this page and try again`;
+            }
+            
+            editorDiv.innerHTML = `<pre style="padding: 20px; color: #f85149; font-family: monospace; white-space: pre-wrap; line-height: 1.5;">${fallbackMessage}</pre>`;
         }
         
         showStatus('Error occurred', 'error');
